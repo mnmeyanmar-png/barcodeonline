@@ -289,14 +289,13 @@ const BarcodeGenerator = () => {
         <header className="text-center mb-8 relative">
           <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">Barcode Sheet Generator</h1>
           <p className="mt-2 text-lg text-slate-400">Create printable A4 sheets with your barcodes</p>
-          <Button 
+          <button
             onClick={handleSignOut}
-            variant="outline"
-            className="absolute top-0 right-0 w-auto px-4 py-2"
             disabled={isSigningOut}
+            className="absolute top-0 right-0 flex items-center justify-center gap-2 w-auto px-4 py-2 border border-brand-600 text-brand-400 bg-transparent hover:bg-brand-500/10 rounded-md shadow-sm text-base font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-900 focus:ring-brand-500 disabled:cursor-not-allowed disabled:border-slate-600 disabled:text-slate-500"
           >
             {isSigningOut ? <SpinnerIcon /> : 'Sign Out'}
-          </Button>
+          </button>
         </header>
         
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
