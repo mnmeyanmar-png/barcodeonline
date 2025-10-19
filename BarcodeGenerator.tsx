@@ -28,7 +28,7 @@ const BarcodeGenerator = () => {
       url: '', // Initially empty, will be resolved by useEffect
       title: '',
       horizontalCount: 5,
-      verticalCount: 10,
+      verticalCount: 12,
       marginTop: 0.5,
       validationStatus: 'loading', // Start in loading state to trigger initial fetch
     }
