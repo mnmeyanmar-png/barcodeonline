@@ -24,13 +24,13 @@ const BarcodeGenerator = () => {
   const [barcodeGroups, setBarcodeGroups] = useState<BarcodeGroup[]>([
     {
       id: Date.now(),
-      inputValue: '123',
-      url: '', 
+      inputValue: '123', // Default example value
+      url: '', // Initially empty, will be resolved by useEffect
       title: '',
       horizontalCount: 5,
       verticalCount: 10,
       marginTop: 0.5,
-      validationStatus: 'loading',
+      validationStatus: 'loading', // Start in loading state to trigger initial fetch
     }
   ]);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -38,36 +38,49 @@ const BarcodeGenerator = () => {
   const [error, setError] = useState<string | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
+  // Helper function to update a specific field in a group
   const updateGroup = (idToUpdate: number, field: keyof BarcodeGroup, value: string | number | ValidationStatus) => {
      setBarcodeGroups(prev => prev.map(group => 
         group.id === idToUpdate ? { ...group, [field]: value } : group
      ));
   };
   
+  // This effect watches for input changes and fetches from Supabase
   useEffect(() => {
     const handler = setTimeout(async () => {
       const groupToProcess = barcodeGroups.find(g => g.validationStatus === 'loading');
+
       if (!groupToProcess) return;
+
       const { id, inputValue } = groupToProcess;
       setError(null);
-      if (inputValue.startsWith('http')) {
+
+      if (inputValue.startsWith('http://') || inputValue.startsWith('https://')) {
         updateGroup(id, 'url', inputValue);
         updateGroup(id, 'validationStatus', 'success');
         return;
       }
+
       if (inputValue.trim() === '') {
         updateGroup(id, 'url', '');
         updateGroup(id, 'validationStatus', 'idle');
         return;
       }
+
       try {
-        const { data, error: dbError } = await supabase.from('barcodes').select('image_url').eq('barcode_number', inputValue).single();
+        const { data, error: dbError } = await supabase
+          .from('barcodes')
+          .select('image_url')
+          .eq('barcode_number', inputValue)
+          .single();
+
         if (dbError) {
           setError(`Barcode number "${inputValue}" not found.`);
           updateGroup(id, 'url', '');
           updateGroup(id, 'validationStatus', 'error');
           return;
         }
+
         if (data && data.image_url) {
           updateGroup(id, 'url', data.image_url);
           updateGroup(id, 'validationStatus', 'success');
@@ -82,18 +95,23 @@ const BarcodeGenerator = () => {
         updateGroup(id, 'validationStatus', 'error');
       }
     }, 500);
+
     return () => clearTimeout(handler);
   }, [barcodeGroups]);
+
 
   const drawOnCanvas = useCallback(async (canvas: HTMLCanvasElement, groups: BarcodeGroup[], isPreview: boolean) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
+
     const A4_WIDTH_INCHES = orientation === 'portrait' ? A4_PORTRAIT_WIDTH_INCHES : A4_PORTRAIT_HEIGHT_INCHES;
     const A4_HEIGHT_INCHES = orientation === 'portrait' ? A4_PORTRAIT_HEIGHT_INCHES : A4_PORTRAIT_WIDTH_INCHES;
     const A4_WIDTH_PX = A4_WIDTH_INCHES * DPI;
     const A4_HEIGHT_PX = A4_HEIGHT_INCHES * DPI;
+
     const logicalCanvasWidth = isPreview ? canvas.offsetWidth : A4_WIDTH_PX;
     const logicalCanvasHeight = isPreview ? canvas.offsetHeight : A4_HEIGHT_PX;
+    
     if (isPreview) {
         const dpr = window.devicePixelRatio || 1;
         canvas.width = logicalCanvasWidth * dpr;
@@ -103,26 +121,35 @@ const BarcodeGenerator = () => {
         canvas.width = A4_WIDTH_PX;
         canvas.height = A4_HEIGHT_PX;
     }
+    
     ctx.fillStyle = 'white';
     ctx.fillRect(0, 0, logicalCanvasWidth, logicalCanvasHeight);
+
     const validGroups = groups.filter(g => g.url.trim() !== '' && g.horizontalCount > 0 && g.verticalCount > 0);
     if (validGroups.length === 0) return;
+
     const drawContent = async () => {
       let currentYOffset = 0;
+
       for (const group of validGroups) {
         currentYOffset += group.marginTop * DPI;
+        
         if (group.title && group.title.trim() !== '') {
             const fontSizePt = 16;
             const fontSizePx = (fontSizePt / 72) * DPI;
             ctx.font = `bold ${fontSizePx}px sans-serif`;
             ctx.fillStyle = 'black';
             ctx.textAlign = 'center';
+            
             const textX = A4_WIDTH_PX / 2;
             const textY = currentYOffset + fontSizePx;
+
             ctx.fillText(group.title, textX, textY);
+
             const titlePadding = fontSizePx * 0.5;
             currentYOffset += fontSizePx + titlePadding;
         }
+
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
           const image = new Image();
           image.crossOrigin = "anonymous";
@@ -130,6 +157,7 @@ const BarcodeGenerator = () => {
           image.onerror = () => reject(new Error(`Failed to load: ${group.url.substring(0, 50)}...`));
           image.src = group.url;
         });
+
         let barcodeWidth = img.naturalWidth;
         let barcodeHeight = img.naturalHeight;
         if (group.url.toLowerCase().endsWith('.svg')) {
@@ -138,16 +166,21 @@ const BarcodeGenerator = () => {
             barcodeWidth *= scaleFactor;
             barcodeHeight *= scaleFactor;
         }
+
         if (barcodeWidth === 0 || barcodeHeight === 0) {
            throw new Error(`Image from ${group.url.substring(0, 50)}... has zero dimensions.`);
         }
+        
         const groupGridWidth = group.horizontalCount * barcodeWidth;
         const groupGridHeight = group.verticalCount * barcodeHeight;
+
         if (currentYOffset + groupGridHeight > A4_HEIGHT_PX) {
             throw new Error('Content overflows A4 page. Reduce counts or increase margins.');
         }
+
         const startX = (A4_WIDTH_PX - groupGridWidth) / 2;
         const startY = currentYOffset;
+
         for (let y = 0; y < group.verticalCount; y++) {
           for (let x = 0; x < group.horizontalCount; x++) {
             const drawX = startX + x * barcodeWidth;
@@ -155,9 +188,11 @@ const BarcodeGenerator = () => {
             ctx.drawImage(img, drawX, drawY, barcodeWidth, barcodeHeight);
           }
         }
+        
         currentYOffset += groupGridHeight;
       }
     }
+
     try {
       if (isPreview) {
           const scaleToFit = Math.min(logicalCanvasWidth / A4_WIDTH_PX, logicalCanvasHeight / A4_HEIGHT_PX);
@@ -232,13 +267,17 @@ const BarcodeGenerator = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8 font-sans">
-        <Button variant="outline" onClick={() => supabase.auth.signOut()} className="absolute top-4 right-4 w-auto">
-            Sign Out
-        </Button>
       <div className="w-full max-w-7xl mx-auto">
-        <header className="text-center mb-8">
+        <header className="text-center mb-8 relative">
           <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">Barcode Sheet Generator</h1>
           <p className="mt-2 text-lg text-slate-400">Create printable A4 sheets with your barcodes</p>
+          <Button 
+            onClick={() => supabase.auth.signOut()}
+            variant="outline"
+            className="absolute top-0 right-0 w-auto px-4 py-2"
+          >
+            Sign Out
+          </Button>
         </header>
         
         <main className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -269,7 +308,7 @@ const BarcodeGenerator = () => {
                               type="text"
                               value={group.inputValue}
                               onChange={(e) => handleInputChange(group.id, e.target.value)}
-                              placeholder="Enter URL or Barcode Number"
+          _aistudio_selection_start_                    placeholder="Enter URL or Barcode Number"
                               validationStatus={group.validationStatus}
                             />
                            <Input
