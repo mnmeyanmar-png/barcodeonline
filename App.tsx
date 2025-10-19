@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Session } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
-import Auth from './Auth';
+import AuthComponent from './Auth';
 import BarcodeGenerator from './BarcodeGenerator';
+import { Session } from '@supabase/supabase-js';
 
-const App = () => {
+function App() {
   const [session, setSession] = useState<Session | null>(null);
 
   useEffect(() => {
@@ -24,14 +24,12 @@ const App = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // If there is no session, show the login page.
-  // Otherwise, show the main barcode generator app.
   return (
     <div>
-      {!session ? <Auth /> : <BarcodeGenerator key={session.user.id} />}
+      {!session ? <AuthComponent /> : <BarcodeGenerator />}
     </div>
   );
-};
+}
 
 export default App;
 
