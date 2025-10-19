@@ -35,6 +35,7 @@ const BarcodeGenerator = () => {
   ]);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSigningOut, setIsSigningOut] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -262,6 +263,23 @@ const BarcodeGenerator = () => {
         setIsLoading(false);
     }, 'image/png');
   };
+
+  const handleSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Error signing out:', error);
+        setError('Could not sign out.');
+      }
+      // The onAuthStateChange listener in App.tsx will handle the redirect
+    } catch (error) {
+      console.error('Unexpected error signing out:', error);
+      setError('An unexpected error occurred during sign out.');
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
   
   const isDownloadDisabled = isLoading || barcodeGroups.some(g => g.validationStatus !== 'success' || g.horizontalCount <= 0 || g.verticalCount <= 0);
 
@@ -272,11 +290,12 @@ const BarcodeGenerator = () => {
           <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight">Barcode Sheet Generator</h1>
           <p className="mt-2 text-lg text-slate-400">Create printable A4 sheets with your barcodes</p>
           <Button 
-            onClick={() => supabase.auth.signOut()}
+            onClick={handleSignOut}
             variant="outline"
             className="absolute top-0 right-0 w-auto px-4 py-2"
+            disabled={isSigningOut}
           >
-            Sign Out
+            {isSigningOut ? <SpinnerIcon /> : 'Sign Out'}
           </Button>
         </header>
         
